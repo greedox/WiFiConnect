@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SimpleWifi;
+using System;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,12 +18,26 @@ namespace WiFiConnect
                 "yahoo.com",
             };
 
+        static SimpleWifiFacade wifi = new SimpleWifiFacade();
+        static AccessPoint accessPoint;
+
         static async Task Main(string[] args)
         {
             Console.Write("Enter the delay to verify the connection (in seconds): ");
             int checkConnectionDelay = int.Parse(Console.ReadLine()) * 1000;
-            //Start(checkConnectionDelay);
-            await StartAsync(checkConnectionDelay);
+            accessPoint = wifi.SelectAccessPoint();
+
+            Console.WriteLine("Sync (y/n)? Else Async");
+            if (Console.ReadLine().ToLower() == "y")
+            {
+                Console.WriteLine("Started sync");
+                Start(checkConnectionDelay);
+            }
+            else
+            {
+                Console.WriteLine("Started async");
+                await StartAsync(checkConnectionDelay);
+            }
         }
 
         private static void Start(int checkConnectionDelay)
@@ -53,8 +68,9 @@ namespace WiFiConnect
                             $"\n{e.GetType()}");
                     }
 
-                    Console.WriteLine("[Reconnect]");    
-                    ReenableWireless();
+                    Console.WriteLine("[Reconnect]");
+                    //ReenableWireless();
+                    wifi.Connect(accessPoint);
                 }
             }
         }
@@ -72,7 +88,7 @@ namespace WiFiConnect
                         currentHost = hosts.GetNext();
 
                         if (await Network.CheckConnectionAsync(currentHost))
-                            Thread.Sleep(delay);
+                            await Task.Delay(delay);
                         else
                             throw new PingException($"[{DateTime.Now}] Ping is not success to {currentHost}");
 
@@ -88,7 +104,8 @@ namespace WiFiConnect
                     }
 
                     Console.WriteLine("[Reconnect]");
-                    ReenableWireless();
+                    //ReenableWireless();
+                    wifi.Connect(accessPoint);
                 }
             }
         }
