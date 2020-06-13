@@ -21,22 +21,46 @@ namespace WiFiConnect
             return true;
         }
 
+        public static async Task<bool> CheckConnectionWithRetryAsync(string host, int retryDelay)
+        {
+            try
+            {
+                return await AsyncRetry.Do(async () =>
+                {
+                    if (await CheckConnectionAsync(host))
+                        return true;
+                    else
+                        throw new Exception($"[{ DateTime.Now }] Ping is not success to {host}");
+                }, TimeSpan.FromMilliseconds(retryDelay));
+            }
+            catch (AggregateException ex)
+            {
+                foreach (var e in ex.InnerExceptions)
+                {
+                    Console.WriteLine(
+                        $"{e.Message}" +
+                        $"\n{e.GetType()}");
+                }
+                return false;
+            }
+        }
+
         public static async Task<bool> CheckConnectionAsync(string host)
         {
             using (var ping = new Ping())
             {
                 try
                 {
-                    var maxDelay = TimeSpan.FromMilliseconds(1500);
+                    var maxDelay = TimeSpan.FromMilliseconds(1000);
                     var tokenSource = new CancellationTokenSource(maxDelay);
-                    PingReply reply = await Task.Run(() => ping.SendPingAsync(host), tokenSource.Token);
+                    PingReply reply = await Task.Run(() => ping.SendPingAsync(host, 800), tokenSource.Token);
                     if (reply.Status != IPStatus.Success)
                     {
                         return false;
                     }
                     return true;
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     return false;
                 }
@@ -68,6 +92,14 @@ namespace WiFiConnect
                 if (((string)item["NetConnectionId"]) == _wifi_RU)
                     item.InvokeMethod("Enable", null);
             }
+        }
+
+        public static void ReenableWireless()
+        {
+            DisableWireless();
+            Thread.Sleep(300);
+            EnableWireless();
+            Thread.Sleep(5000);
         }
     }
 }

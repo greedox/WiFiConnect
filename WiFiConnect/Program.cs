@@ -1,121 +1,67 @@
 ﻿using SimpleWifi;
 using System;
-using System.Net.NetworkInformation;
-using System.Threading;
+using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace WiFiConnect
 {
     class Program
     {
-        static CyclicList<string> hosts = new CyclicList<string>
-            {
-                "ya.ru",
-                "yandex.ru",
-                "rambler.ru",
-                "google.com",
-                "bing.com",
-                "yahoo.com",
-            };
-
         static SimpleWifiFacade wifi = new SimpleWifiFacade();
         static AccessPoint accessPoint;
+        static string host = "192.168.0.1";
+        static NotifyIcon notifyIcon = new NotifyIcon();
 
-        static async Task Main(string[] args)
+        const int SW_HIDE = 0;
+        const int SW_SHOW = 5;
+        const int SW_Min = 2;
+        const int SW_Max = 3;
+        const int SW_Norm = 4;
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        static void Main(string[] args)
         {
-            Console.Write("Enter the delay to verify the connection (in seconds): ");
-            int checkConnectionDelay = int.Parse(Console.ReadLine()) * 1000;
-            accessPoint = wifi.SelectAccessPoint();
+            accessPoint = wifi.GetKnownAccessPoint();
+            Console.WriteLine($"Connect to {accessPoint.Name}");
+            Worker worker = new Worker(async () => await CheckConnection());
+            worker.Start();
+            Console.WriteLine("Worker Started");
+            InitializeNotifyIcon();
 
-            Console.WriteLine("Sync (y/n)? Else Async");
-            if (Console.ReadLine().ToLower() == "y")
-            {
-                Console.WriteLine("Started sync");
-                Start(checkConnectionDelay);
-            }
-            else
-            {
-                Console.WriteLine("Started async");
-                await StartAsync(checkConnectionDelay);
-            }
+            var handle = GetConsoleWindow();
+            ShowWindow(handle, SW_HIDE);
+
+            Application.Run();
         }
 
-        private static void Start(int checkConnectionDelay)
+        private static void InitializeNotifyIcon()
         {
-            string currentHost = string.Empty;
-            TimeSpan delay = TimeSpan.FromMilliseconds(checkConnectionDelay);
-            while (true)
-            {
-                try
-                {
-                    Retry.Do(() => 
-                    { 
-                        currentHost = hosts.GetNext();
-                        if (!Network.CheckConnection(currentHost))
-                            Thread.Sleep(delay);
-                        else
-                            throw new PingException($"[{DateTime.Now}] Ping is not success to {currentHost}");
-                    }, delay);
-
-                    Thread.Sleep(delay);
-                }
-                catch (AggregateException ex)
-                {
-                    foreach (var e in ex.InnerExceptions)
-                    {
-                        Console.WriteLine(
-                            $"{e.Message}" +
-                            $"\n{e.GetType()}");
-                    }
-
-                    Console.WriteLine("[Reconnect]");
-                    //ReenableWireless();
-                    wifi.Connect(accessPoint);
-                }
-            }
+            notifyIcon.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            notifyIcon.Visible = true;
+            notifyIcon.DoubleClick += TrayIcon_DoubleClick;
         }
 
-        private static async Task StartAsync(int checkConnectionDelay)
+        private static void TrayIcon_DoubleClick(object sender, EventArgs e)
         {
-            string currentHost = string.Empty;
-            TimeSpan delay = TimeSpan.FromMilliseconds(checkConnectionDelay);
-            while (true)
-            {
-                try
-                {
-                    await AsyncRetry.Do(async () =>
-                    {
-                        currentHost = hosts.GetNext();
-
-                        if (await Network.CheckConnectionAsync(currentHost))
-                            await Task.Delay(delay);
-                        else
-                            throw new PingException($"[{DateTime.Now}] Ping is not success to {currentHost}");
-
-                    }, TimeSpan.FromMilliseconds(1500));
-                }
-                catch (AggregateException ex)
-                {
-                    foreach (var e in ex.InnerExceptions)
-                    {
-                        Console.WriteLine(
-                            $"{e.Message}" +
-                            $"\n{e.GetType()}");
-                    }
-
-                    Console.WriteLine("[Reconnect]");
-                    //ReenableWireless();
-                    wifi.Connect(accessPoint);
-                }
-            }
+            var handle = GetConsoleWindow();
+            ShowWindow(handle, SW_SHOW);
         }
 
-        private static void ReenableWireless()
+        private static async Task CheckConnection()
         {
-            Network.DisableWireless();
-            Thread.Sleep(300);
-            Network.EnableWireless();
-            Thread.Sleep(5000);
+            DateTime start = DateTime.Now;
+            if (!await Network.CheckConnectionWithRetryAsync(host, 300))
+            {
+                wifi.Connect(accessPoint);
+                notifyIcon.ShowBalloonTip(3000, "Reconnected", $"{DateTime.Now - start}", ToolTipIcon.Warning);
+            }
         }
     }
 }

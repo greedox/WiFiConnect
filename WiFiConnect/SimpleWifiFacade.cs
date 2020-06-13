@@ -16,7 +16,7 @@ namespace WiFiConnect
         public AccessPoint SelectAccessPoint()
         {
             var accessPoints = _wifi.GetAccessPoints().OrderByDescending(ap => ap.SignalStrength).ToArray();
-
+            
             int i = 0;
             foreach (AccessPoint ap in accessPoints)
                 Console.WriteLine("{0}. {1} {2}% Connected: {3}", i++, ap.Name, ap.SignalStrength, ap.IsConnected);
@@ -28,15 +28,26 @@ namespace WiFiConnect
             return accessPoints[selectedIndex];
         }
 
+        public AccessPoint GetKnownAccessPoint()
+        {
+            var accesPoints = GetAccessPoints().OrderBy(x => x.SignalStrength).ToList();
+
+            var connectedAP = accesPoints.FirstOrDefault(x => x.IsConnected);
+            if (connectedAP != null)
+                return connectedAP;
+            else
+                return accesPoints.FirstOrDefault(x => x.HasProfile);
+        }
+
         public IEnumerable<AccessPoint> GetAccessPoints()
         {
             return _wifi.GetAccessPoints();
         }
 
-        public void Connect(AccessPoint selectedAP, bool overwrite = false)
+        public bool Connect(AccessPoint accessPoint, bool overwrite = false)
         {
             // Auth
-            AuthRequest authRequest = new AuthRequest(selectedAP);
+            AuthRequest authRequest = new AuthRequest(accessPoint);
             //bool overwrite = true;
 
             if (authRequest.IsPasswordRequired)
@@ -59,7 +70,7 @@ namespace WiFiConnect
                         authRequest.Username = Console.ReadLine();
                     }
 
-                    authRequest.Password = PasswordPrompt(selectedAP);
+                    authRequest.Password = PasswordPrompt(accessPoint);
 
                     if (authRequest.IsDomainSupported)
                     {
@@ -70,7 +81,7 @@ namespace WiFiConnect
             }
 
             //selectedAP.ConnectAsync(authRequest, overwrite, OnConnectedComplete);
-            bool connected = selectedAP.Connect(authRequest, overwrite);
+            bool connected = accessPoint.Connect(authRequest, overwrite);
             if (connected)
             {
                 Console.WriteLine("Connection succefuly");
@@ -79,6 +90,7 @@ namespace WiFiConnect
             {
                 Console.WriteLine("Connection failed");
             }
+            return connected;
         }
 
         public string PasswordPrompt(AccessPoint selectedAP)
@@ -95,7 +107,7 @@ namespace WiFiConnect
                 validPassFormat = selectedAP.IsValidPassword(password);
 
                 if (!validPassFormat)
-                    Console.WriteLine("\r\nPassword is not valid for this network type.");
+                    Console.Write("\r\nPassword is not valid for this network type.");
             }
 
             return password;
