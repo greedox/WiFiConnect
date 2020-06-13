@@ -32,7 +32,7 @@ namespace WiFiConnect
         {
             _workerThread = new Task(() =>
             {
-                while (true)
+                while (!_token.IsCancellationRequested)
                 {
                     workerJob();
                     Thread.Sleep(delay);
@@ -50,12 +50,15 @@ namespace WiFiConnect
 
         public void Stop()
         {
-            _tokenSource.Cancel();
-            _workerThread.Wait();
-            _tokenSource.Dispose();
-            _workerThread.Dispose();
-            _tokenSource = null;
-            _workerThread = null;
+            if (IsWorks)
+            {
+                _tokenSource.Cancel();
+                _workerThread.Wait();
+                _tokenSource.Dispose();
+                _workerThread.Dispose();
+                _tokenSource = null;
+                _workerThread = null;
+            }
         }
     }
 }
