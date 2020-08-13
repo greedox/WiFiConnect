@@ -5,7 +5,6 @@ namespace WiFiConnect
 {
     public static class ConsoleWindow
     {
-
         public enum WindowState
         {
             Hide = 0,

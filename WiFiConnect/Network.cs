@@ -21,13 +21,13 @@ namespace WiFiConnect
             return true;
         }
 
-        public static async Task<bool> CheckConnectionWithRetryAsync(string host, int retryDelay)
+        public static async Task<bool> CheckConnectionWithRetryAsync(string host, int pingTimeout, int retryDelay)
         {
             try
             {
                 return await AsyncRetry.Do(async () =>
                 {
-                    if (await CheckConnectionAsync(host))
+                    if (await CheckConnectionAsync(host, pingTimeout))
                         return true;
                     else
                         throw new Exception($"[{ DateTime.Now }] Ping is not success to {host}");
@@ -45,15 +45,15 @@ namespace WiFiConnect
             }
         }
 
-        public static async Task<bool> CheckConnectionAsync(string host)
+        public static async Task<bool> CheckConnectionAsync(string host, int pingTimeout)
         {
             using (var ping = new Ping())
             {
                 try
                 {
-                    var maxDelay = TimeSpan.FromMilliseconds(1000);
+                    var maxDelay = TimeSpan.FromMilliseconds(pingTimeout + 200);
                     var tokenSource = new CancellationTokenSource(maxDelay);
-                    PingReply reply = await Task.Run(() => ping.SendPingAsync(host, 800), tokenSource.Token);
+                    PingReply reply = await Task.Run(() => ping.SendPingAsync(host, pingTimeout), tokenSource.Token);
                     if (reply.Status != IPStatus.Success)
                     {
                         return false;

@@ -8,14 +8,14 @@ namespace WiFiConnect
     {
         public bool IsWorks { get => (_token != null) && _token.IsCancellationRequested; }
 
-        private int delay;
+        private int _delay;
         private Task _workerThread;
         private CancellationTokenSource _tokenSource;
         private CancellationToken _token;
 
         public Worker(Action workerJob, int delay = 2500)
         {
-            this.delay = delay;
+            _delay = delay;
             _tokenSource = new CancellationTokenSource();
             _token = _tokenSource.Token;
             InitializeWorkerThread(workerJob);
@@ -35,7 +35,7 @@ namespace WiFiConnect
                 while (!_token.IsCancellationRequested)
                 {
                     workerJob();
-                    Thread.Sleep(delay);
+                    Thread.Sleep(_delay);
                 }
             }, _token, TaskCreationOptions.LongRunning);
         }
